@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心理咨询助手</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", sans-serif; display: flex; height: 100vh; background: #f5f7fa; }
+  #sidebar { width: 240px; background: #fff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+  #sidebar h2 { padding: 16px; font-size: 16px; border-bottom: 1px solid #e5e7eb; }
+  #new-btn { margin: 12px; padding: 10px; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+  #session-list { flex: 1; overflow-y: auto; padding: 0 12px; }
+  .session-item { padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 4px; }
+  .session-item:hover, .session-item.active { background: #eef2ff; }
+  #main { flex: 1; display: flex; flex-direction: column; }
+  #chat-title { padding: 16px; background: #fff; border-bottom: 1px solid #e5e7eb; font-weight: bold; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; }
+  .msg { max-width: 70%; margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; line-height: 1.6; white-space: pre-wrap; }
+  .msg.user { background: #6366f1; color: #fff; margin-left: auto; }
+  .msg.assistant { background: #fff; border: 1px solid #e5e7eb; }
+  .msg.system { background: #fef3c7; margin: 0 auto; font-size: 12px; }
+  #input-bar { display: flex; padding: 14px; background: #fff; border-top: 1px solid #e5e7eb; }
+  #input { flex: 1; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; resize: none; }
+  #send-btn { margin-left: 10px; padding: 10px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+  #send-btn:disabled { opacity: 0.5; }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>💬 会话列表</h2>
+    <button id="new-btn">+ 新会话</button>
+    <div id="session-list"></div>
+  </div>
+  <div id="main">
+    <div id="chat-title">心理咨询助手</div>
+    <div id="messages"></div>
+    <div id="input-bar">
+      <textarea id="input" rows="1" placeholder="说说你的烦恼吧…（Enter 发送）"></textarea>
+      <button id="send-btn">发送</button>
+    </div>
+  </div>
+<script>
+const API_BASE = "http://8.156.76.161/api";
+let currentSid = null;
+const $ = (id) => document.getElementById(id);
+const USER = "default";
+async function api(path, opts) {
+  const r = await fetch(API_BASE + path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || "请求失败");
+  return data;
+}
+async function loadSessions() {
+  const d = await api("/sessions?user_id=" + USER);
+  $("session-list").innerHTML = "";
+  d.sessions.forEach(s => {
+    const div = document.createElement("div");
+    div.className = "session-item" + (s.session_id === currentSid ? " active" : "");
+    div.textContent = s.title || s.session_id;
+    div.onclick = () => openSession(s.session_id, s.title);
+    $("session-list").appendChild(div);
+  });
+}
+async function openSession(sid, title) {
+  currentSid = sid;
+  $("chat-title").textContent = title || sid;
+  document.querySelectorAll(".session-item").forEach(e => e.classList.remove("active"));
+  loadSessions();
+  const d = await api(`/sessions/${sid}/messages`);
+  $("messages").innerHTML = "";
+  d.messages.forEach(m => addMsg(m.role, m.content));
+}
+function addMsg(role, content) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  div.textContent = content;
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+async function send() {
+  const text = $("input").value.trim();
+  if (!text || !currentSid) return;
+  $("input").value = "";
+  addMsg("user", text);
+  $("send-btn").disabled = true;
+  try {
+    const d = await api(`/sessions/${currentSid}/messages`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({content: text})
+    });
+    addMsg("assistant", d.content);
+  } catch (e) {
+    addMsg("system", "⚠️ " + e.message);
+  }
+  $("send-btn").disabled = false;
+}
+$("new-btn").onclick = async () => {
+  const d = await api("/sessions", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({user_id: USER, title: "新会话 " + new Date().toLocaleTimeString()})});
+  openSession(d.session_id, d.title);
+};
+$("send-btn").onclick = send;
+$("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+loadSessions().then(() => { if (!currentSid) $("messages").innerHTML = '<div class="msg system">👋 点击「+ 新会话」开始咨询</div>'; });
+</script>
+</body>
+</html>
