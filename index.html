@@ -262,8 +262,8 @@
       <span class="kb-label">知识库：</span>
       <button class="kb-opt active" data-kb="all">全部</button>
       <button class="kb-opt" data-kb="purchase">采购</button>
-      <button class="kb-opt" data-kb="purchase_qa">采购问答</button>
       <button class="kb-opt" data-kb="legal">法务</button>
+      <button class="kb-opt" data-kb="psych">心理</button>
     </div>
     <div id="quick-tags"></div>
     <div id="input-bar">
@@ -314,13 +314,13 @@ const QUICK_GROUPS = [
   { name: "💗 心理陪伴", kb: [], items: ["最近压力很大总是失眠，该怎么办？", "如何缓解工作带来的焦虑情绪？"] }
 ];
 // 知识库选项 -> 快捷问题组映射 (all 显示全部, 其余按组匹配)
-const KB_GROUP_MAP = { "all": -1, "purchase": 0, "purchase_qa": 0, "legal": 1 };
+const KB_GROUP_MAP = { "all": -1, "purchase": 0, "legal": 1, "psych": 2 };
 const $ = id => document.getElementById(id);
 let token = localStorage.getItem("token") || "";
 let username = localStorage.getItem("username") || "";
 let role = localStorage.getItem("role") || "";
 let currentSid = null;
-let currentKb = "all"; // all / purchase / purchase_qa / legal
+let currentKb = "all"; // all / purchase / legal / psych
 
 async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -509,7 +509,7 @@ async function streamMessage(text) {
   let res;
   try {
     res = await fetch(`${API_BASE}/sessions/${currentSid}/messages/stream`, {
-      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: true, kb: currentKb })
+      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: currentKb !== "psych", kb: currentKb })
     });
   } catch (e) {
     return fallbackSend(text); // 网络错误 → 回退非流式
