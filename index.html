@@ -133,10 +133,17 @@
   #quick-tags {
     display: flex; align-items: center; gap: 10px; margin: 0 24px 12px;
     padding: 8px 14px; background: #f4f7fc; border: 1px solid var(--border);
-    border-radius: 12px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin;
+    border-radius: 12px; overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none; -ms-overflow-style: none;  /* 隐藏滚动条，保留滚动 */
+    position: relative;
   }
-  #quick-tags::-webkit-scrollbar { height: 3px; }
-  #quick-tags::-webkit-scrollbar-thumb { background: #c8d3e0; border-radius: 2px; }
+  #quick-tags::-webkit-scrollbar { display: none; }  /* WebKit 隐藏滚动条 */
+  /* 右边缘渐隐，提示可横向滑动 */
+  #quick-tags::after {
+    content: ""; position: sticky; right: -14px; flex-shrink: 0;
+    width: 30px; height: 100%; margin-left: -40px; pointer-events: none;
+    background: linear-gradient(to right, transparent, #f4f7fc 80%);
+  }
   #quick-tags .qt-hint {
     flex-shrink: 0; font-size: 12px; color: var(--text-light); font-weight: 600;
   }
