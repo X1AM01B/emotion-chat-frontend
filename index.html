@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>智能客服系统</title>
+<title>公司内部知识库</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 <style>
@@ -247,9 +247,9 @@
 <!-- ===== 登录/注册 ===== -->
 <div id="auth-page">
   <div class="auth-card">
-    <div class="auth-logo">🎧</div>
+    <div class="auth-logo">📚</div>
     <h1 id="auth-title">欢迎登录</h1>
-    <div class="sub">智能客服</div>
+    <div class="sub">公司内部知识库</div>
     <div class="auth-err" id="auth-err"></div>
     <div class="field"><label>用户名</label><input id="auth-username" placeholder="请输入用户名" autocomplete="username"></div>
     <div class="field"><label>密码</label><input id="auth-password" type="password" placeholder="请输入密码" autocomplete="current-password"></div>
@@ -275,14 +275,14 @@
     <button class="admin-btn" id="admin-btn" style="display:none">🛠 用户管理</button>
   </div>
   <div id="main">
-    <div id="chat-title"><span class="dot"></span><span id="chat-title-text">智能客服</span></div>
+    <div id="chat-title"><span class="dot"></span><span id="chat-title-text">内部知识库问答</span></div>
     <div id="messages"></div>
     <div id="kb-bar">
       <span class="kb-label">知识库：</span>
       <button class="kb-opt active" data-kb="all">全部</button>
-      <button class="kb-opt" data-kb="purchase">采购</button>
-      <button class="kb-opt" data-kb="legal">法务</button>
-      <button class="kb-opt" data-kb="psych">心理</button>
+      <button class="kb-opt" data-kb="purchase">员工手册</button>
+      <button class="kb-opt" data-kb="legal">项目接口</button>
+      <button class="kb-opt" data-kb="psych">需求文档</button>
     </div>
     <div id="quick-tags-wrap">
       <button class="qs-btn" id="qs-left" title="向左滚动">‹</button>
@@ -290,7 +290,7 @@
       <button class="qs-btn" id="qs-right" title="向右滚动">›</button>
     </div>
     <div id="input-bar">
-      <textarea id="input" rows="1" placeholder="请输入您的问题，例如：教学楼建设67的中标金额是多少？（Enter 发送）"></textarea>
+      <textarea id="input" rows="1" placeholder="请输入您的问题，例如：请假流程怎么走？（Enter 发送）"></textarea>
       <button id="send-btn">发送</button>
     </div>
   </div>
@@ -332,9 +332,9 @@
 <script>
 const API_BASE = "https://api.3232132.xyz/api";
 const QUICK_GROUPS = [
-  { name: "🛒 采购咨询", kb: ["purchase", "purchase_qa"], items: ["教学楼建设67的中标金额是多少？", "医疗设备采购88的预算和周期是多少？"] },
-  { name: "⚖️ 法务咨询", kb: ["legal"], items: ["供应商对单一来源采购公示有异议怎么办？", "中标通知书发出后有什么法律效力？"] },
-  { name: "💗 心理陪伴", kb: [], items: ["最近压力很大总是失眠，该怎么办？", "如何缓解工作带来的焦虑情绪？"] }
+  { name: "📋 员工手册", kb: ["purchase", "purchase_qa"], items: ["新员工入职流程是怎样的？", "请假和报销的流程怎么走？"] },
+  { name: "🔌 项目接口", kb: ["legal"], items: ["登录接口的鉴权方式是什么？", "XX系统接口文档在哪里查看？"] },
+  { name: "📝 需求文档", kb: [], items: ["商城系统的需求文档包含哪些模块？", "订单模块的需求说明在哪里？"] }
 ];
 // 知识库选项 -> 快捷问题组映射 (all 显示全部, 其余按组匹配)
 const KB_GROUP_MAP = { "all": -1, "purchase": 0, "legal": 1, "psych": 2 };
@@ -343,7 +343,7 @@ let token = localStorage.getItem("token") || "";
 let username = localStorage.getItem("username") || "";
 let role = localStorage.getItem("role") || "";
 let currentSid = null;
-let currentKb = "all"; // all / purchase / legal / psych
+let currentKb = "all"; // all / purchase(员工手册) / legal(项目接口) / psych(需求文档)
 
 async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -368,7 +368,7 @@ function showApp() {
   $("my-role").textContent = role === "admin" ? "管理员" : "普通用户";
   $("my-avatar").textContent = username[0] ? username[0].toUpperCase() : "客";
   $("admin-btn").style.display = role === "admin" ? "block" : "none";
-  $("messages").innerHTML = '<div class="msg system"><div class="bubble">👋 欢迎使用<strong>智能客服</strong>！<br>📌 采购咨询 · 法务咨询 · 心理陪伴<br>点击「＋ 新会话」或下方快捷提问开始吧！</div></div>';
+  $("messages").innerHTML = '<div class="msg system"><div class="bubble">👋 欢迎使用<strong>公司内部知识库</strong>！<br>📌 员工手册 · 项目接口 · 需求文档<br>点击「＋ 新会话」或下方快捷提问开始吧！</div></div>';
   loadSessions();
 }
 async function doAuth() {
@@ -422,7 +422,7 @@ async function loadSessions() {
       if (!confirm("确定删除该会话？")) return;
       try {
         await api(`/sessions/${s.session_id}`, { method: "DELETE" });
-        if (currentSid === s.session_id) { currentSid = null; $("chat-title-text").textContent = "智能客服"; $("messages").innerHTML = ""; }
+        if (currentSid === s.session_id) { currentSid = null; $("chat-title-text").textContent = "内部知识库问答"; $("messages").innerHTML = ""; }
         loadSessions();
       } catch (err) { alert("删除失败：" + err.message); }
     };
@@ -532,7 +532,7 @@ async function streamMessage(text) {
   let res;
   try {
     res = await fetch(`${API_BASE}/sessions/${currentSid}/messages/stream`, {
-      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: currentKb !== "psych", kb: currentKb })
+      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: true, kb: currentKb })
     });
   } catch (e) {
     return fallbackSend(text); // 网络错误 → 回退非流式
