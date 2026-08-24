@@ -309,10 +309,12 @@
 <script>
 const API_BASE = "https://api.3232132.xyz/api";
 const QUICK_GROUPS = [
-  { name: "🛒 采购咨询", items: ["教学楼建设67的中标金额是多少？", "医疗设备采购88的预算和周期是多少？"] },
-  { name: "⚖️ 法务咨询", items: ["供应商对单一来源采购公示有异议怎么办？", "中标通知书发出后有什么法律效力？"] },
-  { name: "💗 心理陪伴", items: ["最近压力很大总是失眠，该怎么办？", "如何缓解工作带来的焦虑情绪？"] }
+  { name: "🛒 采购咨询", kb: ["purchase", "purchase_qa"], items: ["教学楼建设67的中标金额是多少？", "医疗设备采购88的预算和周期是多少？"] },
+  { name: "⚖️ 法务咨询", kb: ["legal"], items: ["供应商对单一来源采购公示有异议怎么办？", "中标通知书发出后有什么法律效力？"] },
+  { name: "💗 心理陪伴", kb: [], items: ["最近压力很大总是失眠，该怎么办？", "如何缓解工作带来的焦虑情绪？"] }
 ];
+// 知识库选项 -> 快捷问题组映射 (all 显示全部, 其余按组匹配)
+const KB_GROUP_MAP = { "all": -1, "purchase": 0, "purchase_qa": 0, "legal": 1 };
 const $ = id => document.getElementById(id);
 let token = localStorage.getItem("token") || "";
 let username = localStorage.getItem("username") || "";
@@ -580,11 +582,19 @@ $("new-btn").onclick = async () => {
 $("send-btn").onclick = send;
 $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 /* 知识库选择器 */
+function filterQuickGroups() {
+  const target = KB_GROUP_MAP[currentKb] ?? -1; // -1=全部
+  document.querySelectorAll(".quick-group").forEach((group, i) => {
+    if (target === -1 || i === target) group.style.display = "";
+    else group.style.display = "none";
+  });
+}
 document.querySelectorAll(".kb-opt").forEach(btn => {
   btn.onclick = () => {
     currentKb = btn.dataset.kb;
     document.querySelectorAll(".kb-opt").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
+    filterQuickGroups();
   };
 });
 
@@ -603,6 +613,7 @@ QUICK_GROUPS.forEach(g => {
   });
   $("quick-tags").appendChild(group);
 });
+filterQuickGroups();
 
 /* ===== 管理员 ===== */
 let adminViewUser = null;
