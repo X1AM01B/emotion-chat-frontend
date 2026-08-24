@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>智能客服系统</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 <style>
   :root {
     --primary: #4f6ef7;
@@ -91,8 +93,10 @@
   .session-item:hover { background: rgba(255,255,255,.08); }
   .session-item.active { background: var(--primary); color: #fff; }
   .session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .session-del { border: none; background: none; color: inherit; font-size: 15px; cursor: pointer; opacity: .4; width: 22px; height: 22px; border-radius: 50%; }
-  .session-del:hover { opacity: 1; background: rgba(255,255,255,.2); }
+  .session-del, .session-rename { border: none; background: none; color: inherit; cursor: pointer; width: 22px; height: 22px; border-radius: 50%; opacity: 0; font-size: 15px; line-height: 1; padding: 0; }
+  .session-rename { font-size: 13px; }
+  .session-item:hover .session-del, .session-item:hover .session-rename { opacity: .45; }
+  .session-del:hover, .session-rename:hover { opacity: 1; background: rgba(255,255,255,.2); }
 
   #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #chat-title {
@@ -118,12 +122,33 @@
   .msg.system { justify-content: center; }
   .msg.system .bubble { background: #eef3ff; color: var(--text); font-size: 13px; max-width: 92%; text-align: center; }
 
-  #quick-tags { display: flex; gap: 8px; padding: 0 24px 12px; flex-wrap: wrap; }
+  #quick-tags { padding: 0 24px 12px; }
+  .quick-group { margin-bottom: 10px; }
+  .quick-group:last-child { margin-bottom: 0; }
+  .quick-group-name { font-size: 11px; color: var(--text-light); margin-bottom: 6px; }
+  .quick-group .quick-tag { margin-right: 8px; margin-bottom: 4px; }
   .quick-tag {
     padding: 7px 14px; border: 1px solid var(--primary); border-radius: 20px;
     background: #fff; color: var(--primary); font-size: 12px; cursor: pointer; transition: all .15s;
   }
   .quick-tag:hover { background: var(--primary); color: #fff; }
+
+  /* ===== Markdown 渲染样式 ===== */
+  .msg.assistant .bubble { white-space: normal; }
+  .msg.assistant .bubble a { color: var(--primary); text-decoration: none; }
+  .msg.assistant .bubble a:hover { text-decoration: underline; }
+  .msg.assistant .bubble code { background: #f0f2f7; padding: 2px 5px; border-radius: 4px; font-size: 12px; font-family: "SF Mono", Consolas, "Courier New", monospace; }
+  .msg.assistant .bubble pre { background: #1e2a44; color: #e6ebf5; padding: 12px 14px; border-radius: 10px; overflow-x: auto; margin: 8px 0; }
+  .msg.assistant .bubble pre code { background: none; padding: 0; color: inherit; }
+  .msg.assistant .bubble ul, .msg.assistant .bubble ol { padding-left: 22px; margin: 6px 0; }
+  .msg.assistant .bubble li { margin: 2px 0; }
+  .msg.assistant .bubble h1, .msg.assistant .bubble h2, .msg.assistant .bubble h3, .msg.assistant .bubble h4, .msg.assistant .bubble h5, .msg.assistant .bubble h6 { margin: 10px 0 6px; line-height: 1.4; }
+  .msg.assistant .bubble p { margin: 6px 0; }
+  .msg.assistant .bubble blockquote { border-left: 3px solid var(--primary); margin: 8px 0; padding: 4px 12px; color: var(--text-light); background: #f8fafc; border-radius: 0 8px 8px 0; }
+  .msg.assistant .bubble table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  .msg.assistant .bubble th, .msg.assistant .bubble td { border: 1px solid var(--border); padding: 6px 10px; }
+  .msg.assistant .bubble img { max-width: 100%; border-radius: 8px; }
+  .msg.assistant .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
   /* ===== 参考文档 ===== */
   .ref-box { margin-top: 8px; font-size: 12px; }
   .ref-toggle {
@@ -268,10 +293,10 @@
 
 <script>
 const API_BASE = "https://api.3232132.xyz/api";
-const QUICK_QUESTIONS = [
-  "教学楼建设67的中标金额是多少？",
-  "供应商对单一来源采购公示有异议怎么办？",
-  "最近压力很大总是失眠，该怎么办？"
+const QUICK_GROUPS = [
+  { name: "🛒 采购咨询", items: ["教学楼建设67的中标金额是多少？", "医疗设备采购88的预算和周期是多少？"] },
+  { name: "⚖️ 法务咨询", items: ["供应商对单一来源采购公示有异议怎么办？", "中标通知书发出后有什么法律效力？"] },
+  { name: "💗 心理陪伴", items: ["最近压力很大总是失眠，该怎么办？", "如何缓解工作带来的焦虑情绪？"] }
 ];
 const $ = id => document.getElementById(id);
 let token = localStorage.getItem("token") || "";
@@ -360,7 +385,22 @@ async function loadSessions() {
         loadSessions();
       } catch (err) { alert("删除失败：" + err.message); }
     };
-    div.appendChild(title); div.appendChild(del);
+    const rename = document.createElement("button");
+    rename.className = "session-rename"; rename.textContent = "✏️"; rename.title = "重命名会话";
+    rename.onclick = async e => {
+      e.stopPropagation();
+      const cur = s.title || s.session_id;
+      const input = prompt("请输入新的会话标题：", cur);
+      if (input === null) return;
+      const newTitle = input.trim();
+      if (!newTitle || newTitle === cur) return;
+      try {
+        await api(`/sessions/${s.session_id}`, { method: "PATCH", body: JSON.stringify({ title: newTitle }) });
+        if (currentSid === s.session_id) $("chat-title-text").textContent = newTitle;
+        loadSessions();
+      } catch (err) { alert("重命名失败：" + err.message); }
+    };
+    div.appendChild(title); div.appendChild(rename); div.appendChild(del);
     $("session-list").appendChild(div);
   });
 }
@@ -373,50 +413,60 @@ async function openSession(sid, title) {
   $("messages").innerHTML = "";
   d.messages.forEach(m => addMsg(m.role, m.content));
 }
+function renderSources(bubble, sources) {
+  if (!sources || !sources.length) return;
+  const box = document.createElement("div");
+  box.className = "ref-box";
+  const toggle = document.createElement("button");
+  toggle.className = "ref-toggle";
+  toggle.textContent = `📎 参考文档 (${sources.length})`;
+  const list = document.createElement("div");
+  list.className = "ref-list";
+  list.style.display = "none";
+  const typeLabel = { purchase: "采购项目", purchase_qa: "采购问答", legal: "法务问答" };
+  sources.forEach(s => {
+    const m = s.meta || {};
+    const item = document.createElement("div");
+    item.className = "ref-item";
+    const tag = document.createElement("span");
+    tag.className = "ref-tag " + (m.type || "");
+    tag.textContent = typeLabel[m.type] || m.type || "文档";
+    const title = document.createElement("span");
+    title.className = "ref-title";
+    title.textContent = m.项目名称 || m.question || "(文档)";
+    const score = document.createElement("span");
+    score.className = "ref-score";
+    score.textContent = `相似度 ${(s.score * 100).toFixed(0)}%`;
+    item.appendChild(tag); item.appendChild(title); item.appendChild(score);
+    if (m.原文) {
+      const orig = document.createElement("span");
+      orig.className = "ref-orig";
+      orig.textContent = m.原文.length > 200 ? m.原文.slice(0, 200) + "…" : m.原文;
+      item.appendChild(orig);
+    }
+    list.appendChild(item);
+  });
+  toggle.onclick = () => { list.style.display = list.style.display === "none" ? "block" : "none"; };
+  box.appendChild(toggle); box.appendChild(list);
+  bubble.appendChild(box);
+}
+function renderMarkdown(text) {
+  return DOMPurify.sanitize(marked.parse(text || "", { breaks: true }));
+}
 function addMsg(role, content, sources) {
   const div = document.createElement("div");
   div.className = "msg " + role;
   const b = document.createElement("div");
   b.className = "bubble";
-  b.textContent = content;
+  // assistant 消息渲染 Markdown（已 sanitize 防 XSS），user/system 保持纯文本
+  if (role === "assistant") {
+    b.innerHTML = renderMarkdown(content);
+  } else {
+    b.textContent = content;
+  }
   div.appendChild(b);
   // 参考文档展示（仅 assistant 且有 sources）
-  if (role === "assistant" && sources && sources.length) {
-    const box = document.createElement("div");
-    box.className = "ref-box";
-    const toggle = document.createElement("button");
-    toggle.className = "ref-toggle";
-    toggle.textContent = `📎 参考文档 (${sources.length})`;
-    const list = document.createElement("div");
-    list.className = "ref-list";
-    list.style.display = "none";
-    const typeLabel = { purchase: "采购项目", purchase_qa: "采购问答", legal: "法务问答" };
-    sources.forEach(s => {
-      const m = s.meta || {};
-      const item = document.createElement("div");
-      item.className = "ref-item";
-      const tag = document.createElement("span");
-      tag.className = "ref-tag " + (m.type || "");
-      tag.textContent = typeLabel[m.type] || m.type || "文档";
-      const title = document.createElement("span");
-      title.className = "ref-title";
-      title.textContent = m.项目名称 || m.question || "(文档)";
-      const score = document.createElement("span");
-      score.className = "ref-score";
-      score.textContent = `相似度 ${(s.score * 100).toFixed(0)}%`;
-      item.appendChild(tag); item.appendChild(title); item.appendChild(score);
-      if (m.原文) {
-        const orig = document.createElement("span");
-        orig.className = "ref-orig";
-        orig.textContent = m.原文.length > 200 ? m.原文.slice(0, 200) + "…" : m.原文;
-        item.appendChild(orig);
-      }
-      list.appendChild(item);
-    });
-    toggle.onclick = () => { list.style.display = list.style.display === "none" ? "block" : "none"; };
-    box.appendChild(toggle); box.appendChild(list);
-    div.appendChild(box);
-  }
+  if (role === "assistant" && sources && sources.length) renderSources(div, sources);
   $("messages").appendChild(div);
   $("messages").scrollTop = $("messages").scrollHeight;
 }
@@ -427,12 +477,85 @@ async function send() {
   addMsg("user", text);
   $("send-btn").disabled = true;
   try {
-    const d = await api(`/sessions/${currentSid}/messages`, { method: "POST", body: JSON.stringify({ content: text, use_rag: true }) });
-    addMsg("assistant", d.content, d.sources || []);
+    await streamMessage(text);
   } catch (e) {
     addMsg("system", "⚠️ " + e.message);
   }
   $("send-btn").disabled = false;
+}
+
+/* ===== SSE 流式发送 ===== */
+async function streamMessage(text) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/sessions/${currentSid}/messages/stream`, {
+      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: true })
+    });
+  } catch (e) {
+    return fallbackSend(text); // 网络错误 → 回退非流式
+  }
+  // 后端不支持流式（404/500 等）或无 body → 回退非流式
+  if (!res.ok || !res.body) return fallbackSend(text);
+
+  const div = document.createElement("div");
+  div.className = "msg assistant";
+  const b = document.createElement("div");
+  b.className = "bubble";
+  div.appendChild(b);
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+
+  let full = "";            // 累积的纯文本（每个 chunk 后整体重新渲染）
+  let gotContent = false;   // 是否已收到过内容（用于覆盖 status 提示）
+  let sourcesRendered = false;
+  const rerender = () => {
+    b.innerHTML = renderMarkdown(full);
+    $("messages").scrollTop = $("messages").scrollHeight;
+  };
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const dataLine = raw.split("\n").find(l => l.trim().startsWith("data:"));
+      if (!dataLine) continue;
+      let evt;
+      try { evt = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+      if (!evt || typeof evt !== "object") continue;
+      if (evt.type === "status") {
+        // 状态提示，待第一个 chunk 到来后会被内容覆盖
+        if (!gotContent) b.textContent = "⏳ " + (evt.msg || "正在处理...");
+      } else if (evt.type === "chunk") {
+        gotContent = true;
+        full += (evt.content || "");
+        rerender();
+      } else if (evt.type === "sources") {
+        if (!sourcesRendered && evt.sources && evt.sources.length) {
+          sourcesRendered = true;
+          renderSources(div, evt.sources);
+        }
+      } else if (evt.type === "error") {
+        b.textContent = "⚠️ " + (evt.detail || "服务出错");
+        return;
+      } else if (evt.type === "done") {
+        return; // 流式正常结束
+      }
+    }
+  }
+  // 流自然结束（未收到 done 也视为完成）
+}
+async function fallbackSend(text) {
+  const d = await api(`/sessions/${currentSid}/messages`, { method: "POST", body: JSON.stringify({ content: text, use_rag: true }) });
+  addMsg("assistant", d.content, d.sources || []);
 }
 $("new-btn").onclick = async () => {
   const d = await api("/sessions", { method: "POST", body: JSON.stringify({ title: "新会话 " + new Date().toLocaleTimeString() }) });
@@ -440,11 +563,20 @@ $("new-btn").onclick = async () => {
 };
 $("send-btn").onclick = send;
 $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
-QUICK_QUESTIONS.forEach(q => {
-  const t = document.createElement("button");
-  t.className = "quick-tag"; t.textContent = q;
-  t.onclick = () => { $("input").value = q; send(); };
-  $("quick-tags").appendChild(t);
+QUICK_GROUPS.forEach(g => {
+  const group = document.createElement("div");
+  group.className = "quick-group";
+  const label = document.createElement("div");
+  label.className = "quick-group-name";
+  label.textContent = g.name;
+  group.appendChild(label);
+  g.items.forEach(q => {
+    const t = document.createElement("button");
+    t.className = "quick-tag"; t.textContent = q;
+    t.onclick = () => { $("input").value = q; send(); };
+    group.appendChild(t);
+  });
+  $("quick-tags").appendChild(group);
 });
 
 /* ===== 管理员 ===== */
@@ -513,9 +645,13 @@ async function adminViewChat(sid, title) {
     const div = document.createElement("div");
     div.style.cssText = `margin-bottom:12px;display:flex;${m.role === "user" ? "justify-content:flex-end;" : ""}`;
     const b = document.createElement("div");
-    b.style.cssText = `max-width:75%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;${
+    b.style.cssText = `max-width:75%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;word-break:break-word;${
       m.role === "user" ? "background:var(--primary);color:#fff;" : "background:#fff;border:1px solid var(--border);"}`;
-    b.textContent = m.content;
+    if (m.role === "assistant") {
+      b.innerHTML = renderMarkdown(m.content);
+    } else {
+      b.textContent = m.content;
+    }
     div.appendChild(b);
     box.appendChild(div);
   });
