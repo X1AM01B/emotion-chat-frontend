@@ -145,10 +145,9 @@
     background: rgba(255,255,255,.85); color: var(--text-light);
     font-size: 15px; line-height: 24px; text-align: center;
     box-shadow: 0 1px 4px rgba(30,42,68,.15); z-index: 2;
-    transition: all .2s; display: none; user-select: none;
+    transition: all .2s; display: block; user-select: none;
   }
   .qs-btn:hover { background: var(--primary); color: #fff; }
-  .qs-btn.show { display: block; }
   #qs-left { left: 4px; }
   #qs-right { right: 4px; }
   #quick-tags .qt-hint {
@@ -621,12 +620,18 @@ function updateQsBtns() {
   if (!el) return;
   const maxScroll = el.scrollWidth - el.clientWidth;
   const canScroll = maxScroll > 4;
-  $("qs-left").classList.toggle("show", canScroll && el.scrollLeft > 4);
-  $("qs-right").classList.toggle("show", canScroll && el.scrollLeft < maxScroll - 4);
+  // 反转逻辑：默认显示，仅当完全无法滚动或到边界时隐藏对应按钮
+  $("qs-left").style.display = (canScroll && el.scrollLeft > 4) ? "block" : "none";
+  $("qs-right").style.display = (canScroll && el.scrollLeft < maxScroll - 4) ? "block" : "none";
 }
 $("qs-left").onclick = () => { $("quick-tags").scrollBy({ left: -220, behavior: "smooth" }); };
 $("qs-right").onclick = () => { $("quick-tags").scrollBy({ left: 220, behavior: "smooth" }); };
 $("quick-tags").addEventListener("scroll", updateQsBtns, { passive: true });
+// 字体/布局就绪后重算按钮显隐（延迟 + 帧回调 + resize）
+function refreshQsBtns() { requestAnimationFrame(() => { requestAnimationFrame(updateQsBtns); }); }
+window.addEventListener("resize", refreshQsBtns);
+setTimeout(refreshQsBtns, 100);
+setTimeout(refreshQsBtns, 500);
 document.querySelectorAll(".kb-opt").forEach(btn => {
   btn.onclick = () => {
     currentKb = btn.dataset.kb;
