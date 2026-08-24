@@ -130,20 +130,27 @@
   }
   .kb-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
   .kb-opt:hover { border-color: var(--primary); }
+  #quick-tags-wrap { position: relative; margin: 0 24px 12px; }
   #quick-tags {
-    display: flex; align-items: center; gap: 10px; margin: 0 24px 12px;
-    padding: 8px 14px; background: #f4f7fc; border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 34px; background: #f4f7fc; border: 1px solid var(--border);
     border-radius: 12px; overflow-x: auto; white-space: nowrap;
     scrollbar-width: none; -ms-overflow-style: none;  /* 隐藏滚动条，保留滚动 */
-    position: relative;
+    scroll-behavior: smooth;
   }
   #quick-tags::-webkit-scrollbar { display: none; }  /* WebKit 隐藏滚动条 */
-  /* 右边缘渐隐，提示可横向滑动 */
-  #quick-tags::after {
-    content: ""; position: sticky; right: -14px; flex-shrink: 0;
-    width: 30px; height: 100%; margin-left: -40px; pointer-events: none;
-    background: linear-gradient(to right, transparent, #f4f7fc 80%);
+  .qs-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(255,255,255,.85); color: var(--text-light);
+    font-size: 15px; line-height: 24px; text-align: center;
+    box-shadow: 0 1px 4px rgba(30,42,68,.15); z-index: 2;
+    transition: all .2s; display: none; user-select: none;
   }
+  .qs-btn:hover { background: var(--primary); color: #fff; }
+  .qs-btn.show { display: block; }
+  #qs-left { left: 4px; }
+  #qs-right { right: 4px; }
   #quick-tags .qt-hint {
     flex-shrink: 0; font-size: 12px; color: var(--text-light); font-weight: 600;
   }
@@ -278,7 +285,11 @@
       <button class="kb-opt" data-kb="legal">法务</button>
       <button class="kb-opt" data-kb="psych">心理</button>
     </div>
-    <div id="quick-tags"></div>
+    <div id="quick-tags-wrap">
+      <button class="qs-btn" id="qs-left" title="向左滚动">‹</button>
+      <div id="quick-tags"></div>
+      <button class="qs-btn" id="qs-right" title="向右滚动">›</button>
+    </div>
     <div id="input-bar">
       <textarea id="input" rows="1" placeholder="请输入您的问题，例如：教学楼建设67的中标金额是多少？（Enter 发送）"></textarea>
       <button id="send-btn">发送</button>
@@ -601,7 +612,21 @@ function filterQuickGroups() {
     const gi = parseInt(t.dataset.grp, 10);
     t.style.display = (target === -1 || gi === target) ? "" : "none";
   });
+  updateQsBtns(); // 过滤后刷新按钮状态
 }
+
+/* 快捷问题左右滚动按钮 */
+function updateQsBtns() {
+  const el = $("quick-tags");
+  if (!el) return;
+  const maxScroll = el.scrollWidth - el.clientWidth;
+  const canScroll = maxScroll > 4;
+  $("qs-left").classList.toggle("show", canScroll && el.scrollLeft > 4);
+  $("qs-right").classList.toggle("show", canScroll && el.scrollLeft < maxScroll - 4);
+}
+$("qs-left").onclick = () => { $("quick-tags").scrollBy({ left: -220, behavior: "smooth" }); };
+$("qs-right").onclick = () => { $("quick-tags").scrollBy({ left: 220, behavior: "smooth" }); };
+$("quick-tags").addEventListener("scroll", updateQsBtns, { passive: true });
 document.querySelectorAll(".kb-opt").forEach(btn => {
   btn.onclick = () => {
     currentKb = btn.dataset.kb;
