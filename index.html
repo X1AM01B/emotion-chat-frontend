@@ -130,12 +130,20 @@
   }
   .kb-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
   .kb-opt:hover { border-color: var(--primary); }
-  #quick-tags { display: flex; align-items: center; gap: 8px; padding: 6px 24px 10px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
-  #quick-tags::-webkit-scrollbar { height: 4px; }
+  #quick-tags {
+    display: flex; align-items: center; gap: 10px; margin: 0 24px 12px;
+    padding: 8px 14px; background: #f4f7fc; border: 1px solid var(--border);
+    border-radius: 12px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin;
+  }
+  #quick-tags::-webkit-scrollbar { height: 3px; }
   #quick-tags::-webkit-scrollbar-thumb { background: #c8d3e0; border-radius: 2px; }
+  #quick-tags .qt-hint {
+    flex-shrink: 0; font-size: 12px; color: var(--text-light); font-weight: 600;
+  }
   .quick-tag {
-    padding: 7px 14px; border: 1px solid var(--primary); border-radius: 20px;
-    background: #fff; color: var(--primary); font-size: 12px; cursor: pointer; transition: all .15s;
+    flex-shrink: 0; padding: 5px 12px; border: none; border-radius: 14px;
+    background: #fff; color: var(--text); font-size: 12px; cursor: pointer; transition: all .15s;
+    box-shadow: 0 1px 3px rgba(30,42,68,.06);
   }
   .quick-tag:hover { background: var(--primary); color: #fff; }
 
@@ -598,6 +606,10 @@ document.querySelectorAll(".kb-opt").forEach(btn => {
 
 // 一行紧凑示例问题（保留 kb 联动过滤）
 const quickTagEls = [];
+const qtHint = document.createElement("span");
+qtHint.className = "qt-hint";
+qtHint.textContent = "💡 试试问：";
+$("quick-tags").appendChild(qtHint);
 QUICK_GROUPS.forEach((g, gi) => {
   g.items.forEach(q => {
     const t = document.createElement("button");
