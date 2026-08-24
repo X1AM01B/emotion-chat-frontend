@@ -346,6 +346,7 @@ function showApp() {
   $("my-avatar").textContent = username[0] ? username[0].toUpperCase() : "客";
   $("admin-btn").style.display = role === "admin" ? "block" : "none";
   $("messages").innerHTML = '<div class="msg system"><div class="bubble">👋 欢迎使用<strong>政府采购智能客服</strong>！<br>📌 采购咨询 · 法务咨询 · 心理陪伴<br>点击「＋ 新会话」或下方快捷提问开始吧！</div></div>';
+  quickShown = true; $("quick-tags").classList.add("show"); $("quick-toggle").style.background = "#f0f4ff";
   loadSessions();
 }
 async function doAuth() {
@@ -430,6 +431,9 @@ async function openSession(sid, title) {
   const d = await api(`/sessions/${sid}/messages`);
   $("messages").innerHTML = "";
   d.messages.forEach(m => addMsg(m.role, m.content));
+  // 有历史消息时隐藏快捷问题；空会话时显示引导
+  if (d.messages.length > 0) { quickShown = false; $("quick-tags").classList.remove("show"); }
+  else if (!quickShown) { quickShown = true; $("quick-tags").classList.add("show"); }
 }
 function renderSources(bubble, sources) {
   if (!sources || !sources.length) return;
@@ -472,6 +476,8 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(text || "", { breaks: true }));
 }
 function addMsg(role, content, sources) {
+  // 用户发出第一条消息后自动收起快捷问题
+  if (role === "user") hideQuickTags();
   const div = document.createElement("div");
   div.className = "msg " + role;
   const b = document.createElement("div");
@@ -589,12 +595,23 @@ function filterQuickGroups() {
     else group.style.display = "none";
   });
 }
+/* 快捷问题展开/收起 */
+let quickShown = false;
+function toggleQuickTags() {
+  quickShown = !quickShown;
+  $("quick-tags").classList.toggle("show", quickShown);
+  $("quick-toggle").style.background = quickShown ? "#f0f4ff" : "#fff";
+}
+function hideQuickTags() { if (quickShown) { quickShown = false; $("quick-tags").classList.remove("show"); } }
+$("quick-toggle").onclick = toggleQuickTags;
+
 document.querySelectorAll(".kb-opt").forEach(btn => {
   btn.onclick = () => {
     currentKb = btn.dataset.kb;
     document.querySelectorAll(".kb-opt").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     filterQuickGroups();
+    toggleQuickTags(); // 切换知识库时同步展示/收起对应示例问题
   };
 });
 
