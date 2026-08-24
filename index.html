@@ -122,6 +122,14 @@
   .msg.system { justify-content: center; }
   .msg.system .bubble { background: #eef3ff; color: var(--text); font-size: 13px; max-width: 92%; text-align: center; }
 
+  #kb-bar { display: flex; align-items: center; gap: 8px; padding: 8px 24px 4px; }
+  #kb-bar .kb-label { font-size: 12px; color: var(--text-light); }
+  .kb-opt {
+    padding: 5px 14px; border: 1px solid var(--border); border-radius: 16px; background: #fff;
+    font-size: 12px; color: var(--text); cursor: pointer; transition: all .15s;
+  }
+  .kb-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .kb-opt:hover { border-color: var(--primary); }
   #quick-tags { padding: 0 24px 12px; }
   .quick-group { margin-bottom: 10px; }
   .quick-group:last-child { margin-bottom: 0; }
@@ -250,6 +258,13 @@
   <div id="main">
     <div id="chat-title"><span class="dot"></span><span id="chat-title-text">政府采购智能客服</span></div>
     <div id="messages"></div>
+    <div id="kb-bar">
+      <span class="kb-label">知识库：</span>
+      <button class="kb-opt active" data-kb="all">全部</button>
+      <button class="kb-opt" data-kb="purchase">采购</button>
+      <button class="kb-opt" data-kb="purchase_qa">采购问答</button>
+      <button class="kb-opt" data-kb="legal">法务</button>
+    </div>
     <div id="quick-tags"></div>
     <div id="input-bar">
       <textarea id="input" rows="1" placeholder="请输入您的问题，例如：教学楼建设67的中标金额是多少？（Enter 发送）"></textarea>
@@ -303,6 +318,7 @@ let token = localStorage.getItem("token") || "";
 let username = localStorage.getItem("username") || "";
 let role = localStorage.getItem("role") || "";
 let currentSid = null;
+let currentKb = "all"; // all / purchase / purchase_qa / legal
 
 async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -491,7 +507,7 @@ async function streamMessage(text) {
   let res;
   try {
     res = await fetch(`${API_BASE}/sessions/${currentSid}/messages/stream`, {
-      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: true })
+      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: true, kb: currentKb })
     });
   } catch (e) {
     return fallbackSend(text); // 网络错误 → 回退非流式
@@ -563,6 +579,15 @@ $("new-btn").onclick = async () => {
 };
 $("send-btn").onclick = send;
 $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+/* 知识库选择器 */
+document.querySelectorAll(".kb-opt").forEach(btn => {
+  btn.onclick = () => {
+    currentKb = btn.dataset.kb;
+    document.querySelectorAll(".kb-opt").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  };
+});
+
 QUICK_GROUPS.forEach(g => {
   const group = document.createElement("div");
   group.className = "quick-group";
