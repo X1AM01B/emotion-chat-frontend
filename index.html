@@ -275,7 +275,7 @@
     <button class="admin-btn" id="admin-btn" style="display:none">🛠 用户管理</button>
   </div>
   <div id="main">
-    <div id="chat-title"><span class="dot"></span><span id="chat-title-text">政府采购智能客服</span></div>
+    <div id="chat-title"><span class="dot"></span><span id="chat-title-text">智能客服</span></div>
     <div id="messages"></div>
     <div id="kb-bar">
       <span class="kb-label">知识库：</span>
@@ -368,7 +368,7 @@ function showApp() {
   $("my-role").textContent = role === "admin" ? "管理员" : "普通用户";
   $("my-avatar").textContent = username[0] ? username[0].toUpperCase() : "客";
   $("admin-btn").style.display = role === "admin" ? "block" : "none";
-  $("messages").innerHTML = '<div class="msg system"><div class="bubble">👋 欢迎使用<strong>政府采购智能客服</strong>！<br>📌 采购咨询 · 法务咨询 · 心理陪伴<br>点击「＋ 新会话」或下方快捷提问开始吧！</div></div>';
+  $("messages").innerHTML = '<div class="msg system"><div class="bubble">👋 欢迎使用<strong>智能客服</strong>！<br>📌 采购咨询 · 法务咨询 · 心理陪伴<br>点击「＋ 新会话」或下方快捷提问开始吧！</div></div>';
   loadSessions();
 }
 async function doAuth() {
@@ -422,7 +422,7 @@ async function loadSessions() {
       if (!confirm("确定删除该会话？")) return;
       try {
         await api(`/sessions/${s.session_id}`, { method: "DELETE" });
-        if (currentSid === s.session_id) { currentSid = null; $("chat-title-text").textContent = "政府采购智能客服"; $("messages").innerHTML = ""; }
+        if (currentSid === s.session_id) { currentSid = null; $("chat-title-text").textContent = "智能客服"; $("messages").innerHTML = ""; }
         loadSessions();
       } catch (err) { alert("删除失败：" + err.message); }
     };
