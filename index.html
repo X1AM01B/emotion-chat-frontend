@@ -124,6 +124,23 @@
     background: #fff; color: var(--primary); font-size: 12px; cursor: pointer; transition: all .15s;
   }
   .quick-tag:hover { background: var(--primary); color: #fff; }
+  /* ===== 参考文档 ===== */
+  .ref-box { margin-top: 8px; font-size: 12px; }
+  .ref-toggle {
+    background: #f0f4ff; border: 1px solid #d3e0fd; color: var(--primary);
+    padding: 5px 12px; border-radius: 14px; cursor: pointer; font-size: 12px;
+  }
+  .ref-toggle:hover { background: #e0eaff; }
+  .ref-list { margin-top: 6px; padding: 8px 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; }
+  .ref-item { padding: 6px 8px; border-bottom: 1px dashed var(--border); font-size: 12px; color: var(--text); }
+  .ref-item:last-child { border-bottom: none; }
+  .ref-item .ref-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; margin-right: 6px; }
+  .ref-tag.purchase { background: #d1fae5; color: #065f46; }
+  .ref-tag.purchase_qa { background: #e0e7ff; color: #3730a3; }
+  .ref-tag.legal { background: #fef3c7; color: #92400e; }
+  .ref-item .ref-title { font-weight: 600; margin-right: 6px; }
+  .ref-item .ref-score { color: var(--text-light); }
+  .ref-item .ref-orig { display: block; margin-top: 3px; color: var(--text-light); white-space: pre-wrap; word-break: break-word; max-height: 80px; overflow-y: auto; }
   #input-bar { display: flex; padding: 14px 24px 20px; gap: 12px; }
   #input {
     flex: 1; padding: 13px 16px; border: 1.5px solid var(--border); border-radius: 12px;
@@ -356,13 +373,50 @@ async function openSession(sid, title) {
   $("messages").innerHTML = "";
   d.messages.forEach(m => addMsg(m.role, m.content));
 }
-function addMsg(role, content) {
+function addMsg(role, content, sources) {
   const div = document.createElement("div");
   div.className = "msg " + role;
   const b = document.createElement("div");
   b.className = "bubble";
   b.textContent = content;
   div.appendChild(b);
+  // 参考文档展示（仅 assistant 且有 sources）
+  if (role === "assistant" && sources && sources.length) {
+    const box = document.createElement("div");
+    box.className = "ref-box";
+    const toggle = document.createElement("button");
+    toggle.className = "ref-toggle";
+    toggle.textContent = `📎 参考文档 (${sources.length})`;
+    const list = document.createElement("div");
+    list.className = "ref-list";
+    list.style.display = "none";
+    const typeLabel = { purchase: "采购项目", purchase_qa: "采购问答", legal: "法务问答" };
+    sources.forEach(s => {
+      const m = s.meta || {};
+      const item = document.createElement("div");
+      item.className = "ref-item";
+      const tag = document.createElement("span");
+      tag.className = "ref-tag " + (m.type || "");
+      tag.textContent = typeLabel[m.type] || m.type || "文档";
+      const title = document.createElement("span");
+      title.className = "ref-title";
+      title.textContent = m.项目名称 || m.question || "(文档)";
+      const score = document.createElement("span");
+      score.className = "ref-score";
+      score.textContent = `相似度 ${(s.score * 100).toFixed(0)}%`;
+      item.appendChild(tag); item.appendChild(title); item.appendChild(score);
+      if (m.原文) {
+        const orig = document.createElement("span");
+        orig.className = "ref-orig";
+        orig.textContent = m.原文.length > 200 ? m.原文.slice(0, 200) + "…" : m.原文;
+        item.appendChild(orig);
+      }
+      list.appendChild(item);
+    });
+    toggle.onclick = () => { list.style.display = list.style.display === "none" ? "block" : "none"; };
+    box.appendChild(toggle); box.appendChild(list);
+    div.appendChild(box);
+  }
   $("messages").appendChild(div);
   $("messages").scrollTop = $("messages").scrollHeight;
 }
@@ -373,8 +427,8 @@ async function send() {
   addMsg("user", text);
   $("send-btn").disabled = true;
   try {
-    const d = await api(`/sessions/${currentSid}/messages`, { method: "POST", body: JSON.stringify({ content: text }) });
-    addMsg("assistant", d.content);
+    const d = await api(`/sessions/${currentSid}/messages`, { method: "POST", body: JSON.stringify({ content: text, use_rag: true }) });
+    addMsg("assistant", d.content, d.sources || []);
   } catch (e) {
     addMsg("system", "⚠️ " + e.message);
   }
