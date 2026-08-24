@@ -161,6 +161,10 @@
   .role-badge.user { background: #e0e7ff; color: #3730a3; }
   .btn-danger { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
   .btn-danger:hover { background: var(--danger); color: #fff; }
+  .btn-view { background: none; border: 1px solid var(--primary); color: var(--primary); padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+  .btn-view:hover { background: var(--primary); color: #fff; }
+  .btn-back { background: none; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 14px; }
+  .btn-back:hover { background: #f0f4ff; }
   .admin-btn {
     margin: 8px 14px 0; padding: 10px; border: none; border-radius: 10px; cursor: pointer;
     background: rgba(255,255,255,.1); color: #cbd6ea; font-size: 13px;
@@ -216,16 +220,32 @@
 <div id="admin-panel">
   <div class="admin-card">
     <h2>👥 用户管理 <button class="close" id="admin-close">×</button></h2>
-    <div class="admin-add">
-      <input id="add-username" placeholder="新用户用户名">
-      <input id="add-password" type="password" placeholder="初始密码">
-      <button class="btn-primary" id="add-user-btn">添加用户</button>
+    <div id="admin-view-list">
+      <div class="admin-add">
+        <input id="add-username" placeholder="新用户用户名">
+        <input id="add-password" type="password" placeholder="初始密码">
+        <button class="btn-primary" id="add-user-btn">添加用户</button>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>会话数</th><th>注册时间</th><th>操作</th></tr></thead>
+        <tbody id="user-table"></tbody>
+      </table>
+      <div class="empty" id="user-empty" style="display:none">暂无用户</div>
     </div>
-    <table>
-      <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>会话数</th><th>注册时间</th><th>操作</th></tr></thead>
-      <tbody id="user-table"></tbody>
-    </table>
-    <div class="empty" id="user-empty" style="display:none">暂无用户</div>
+    <div id="admin-view-sessions" style="display:none">
+      <button class="btn-back" id="admin-back-sessions">← 返回用户列表</button>
+      <h3 id="admin-user-title" style="margin-bottom:12px;font-size:15px;"></h3>
+      <table>
+        <thead><tr><th>会话标题</th><th>消息数</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody id="user-sessions-table"></tbody>
+      </table>
+      <div class="empty" id="user-sessions-empty" style="display:none">该用户暂无会话</div>
+    </div>
+    <div id="admin-view-chat" style="display:none">
+      <button class="btn-back" id="admin-back-chat">← 返回会话列表</button>
+      <h3 id="admin-chat-title" style="margin-bottom:12px;font-size:15px;"></h3>
+      <div id="admin-chat-msgs" style="max-height:50vh;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:16px;"></div>
+    </div>
   </div>
 </div>
 
@@ -374,6 +394,12 @@ QUICK_QUESTIONS.forEach(q => {
 });
 
 /* ===== 管理员 ===== */
+let adminViewUser = null;
+function adminShowView(name) {
+  $("admin-view-list").style.display = name === "list" ? "block" : "none";
+  $("admin-view-sessions").style.display = name === "sessions" ? "block" : "none";
+  $("admin-view-chat").style.display = name === "chat" ? "block" : "none";
+}
 async function loadUsers() {
   const d = await api("/admin/users");
   const tb = $("user-table");
@@ -384,7 +410,10 @@ async function loadUsers() {
     tr.innerHTML = `<td>${u.id}</td><td>${u.username}</td>
       <td><span class="role-badge ${u.role}">${u.role === "admin" ? "管理员" : "用户"}</span></td>
       <td>${u.session_count}</td><td>${u.created_at}</td>
-      <td>${u.username === username ? "当前账号" : `<button class="btn-danger" data-del="${u.id}" data-name="${u.username}">删除</button>`}</td>`;
+      <td>
+        <button class="btn-view" data-view="${u.username}">查看对话</button>
+        ${u.username === username ? "当前账号" : `<button class="btn-danger" data-del="${u.id}" data-name="${u.username}">删除</button>`}
+      </td>`;
     tb.appendChild(tr);
   });
   tb.querySelectorAll("[data-del]").forEach(btn => {
@@ -397,9 +426,51 @@ async function loadUsers() {
       } catch (e) { alert(e.message); }
     };
   });
+  tb.querySelectorAll("[data-view]").forEach(btn => {
+    btn.onclick = () => adminViewUserSessions(btn.dataset.view);
+  });
 }
-$("admin-btn").onclick = () => { $("admin-panel").classList.add("show"); loadUsers(); };
+async function adminViewUserSessions(uname) {
+  adminViewUser = uname;
+  adminShowView("sessions");
+  $("admin-user-title").textContent = `📋 用户「${uname}」的会话`;
+  const d = await api(`/admin/users/${uname}/sessions`);
+  const tb = $("user-sessions-table");
+  tb.innerHTML = "";
+  $("user-sessions-empty").style.display = d.sessions.length ? "none" : "block";
+  d.sessions.forEach(s => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${s.title || s.session_id}</td><td>${s.msg_count}</td>
+      <td>${s.created_at}</td>
+      <td><button class="btn-view" data-sid="${s.session_id}" data-title="${(s.title || s.session_id).replace(/"/g, '&quot;')}">查看对话</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("[data-sid]").forEach(btn => {
+    btn.onclick = () => adminViewChat(btn.dataset.sid, btn.dataset.title);
+  });
+}
+async function adminViewChat(sid, title) {
+  adminShowView("chat");
+  $("admin-chat-title").textContent = `💬 ${title}`;
+  const d = await api(`/sessions/${sid}/messages`);
+  const box = $("admin-chat-msgs");
+  box.innerHTML = "";
+  d.messages.forEach(m => {
+    const div = document.createElement("div");
+    div.style.cssText = `margin-bottom:12px;display:flex;${m.role === "user" ? "justify-content:flex-end;" : ""}`;
+    const b = document.createElement("div");
+    b.style.cssText = `max-width:75%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;${
+      m.role === "user" ? "background:var(--primary);color:#fff;" : "background:#fff;border:1px solid var(--border);"}`;
+    b.textContent = m.content;
+    div.appendChild(b);
+    box.appendChild(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+$("admin-btn").onclick = () => { $("admin-panel").classList.add("show"); adminShowView("list"); loadUsers(); };
 $("admin-close").onclick = () => $("admin-panel").classList.remove("show");
+$("admin-back-sessions").onclick = () => adminShowView("list");
+$("admin-back-chat").onclick = () => { if (adminViewUser) adminViewUserSessions(adminViewUser); };
 $("add-user-btn").onclick = async () => {
   const u = $("add-username").value.trim();
   const p = $("add-password").value;
