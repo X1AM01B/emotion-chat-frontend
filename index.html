@@ -464,17 +464,22 @@ function renderSources(bubble, sources) {
   const list = document.createElement("div");
   list.className = "ref-list";
   list.style.display = "none";
-  const typeLabel = { purchase: "采购项目", purchase_qa: "采购问答", legal: "法务问答" };
+  const typeLabel = {
+    purchase: "采购项目", purchase_qa: "采购问答", legal: "法务问答",
+    "项目简介": "项目简介", "需求文档": "需求文档", "接口文档": "接口文档",
+    "部署手册": "部署手册", "操作手册": "操作手册", internal_doc: "内部文档"
+  };
   sources.forEach(s => {
     const m = s.meta || {};
     const item = document.createElement("div");
     item.className = "ref-item";
     const tag = document.createElement("span");
-    tag.className = "ref-tag " + (m.type || "");
-    tag.textContent = typeLabel[m.type] || m.type || "文档";
+    const docType = m.文档类型 || m.type || "";
+    tag.className = "ref-tag " + (docType === "接口文档" ? "legal" : docType === "需求文档" ? "purchase" : docType === "项目简介" ? "purchase_qa" : m.type || "");
+    tag.textContent = typeLabel[docType] || typeLabel[m.type] || docType || "文档";
     const title = document.createElement("span");
     title.className = "ref-title";
-    title.textContent = m.项目名称 || m.question || "(文档)";
+    title.textContent = m.项目名称 || m.项目 || m.question || "(文档)";
     const score = document.createElement("span");
     score.className = "ref-score";
     score.textContent = `相似度 ${(s.score * 100).toFixed(0)}%`;
