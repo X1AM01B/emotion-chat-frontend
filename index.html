@@ -130,11 +130,9 @@
   }
   .kb-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
   .kb-opt:hover { border-color: var(--primary); }
-  #quick-tags { padding: 0 24px 12px; }
-  .quick-group { margin-bottom: 10px; }
-  .quick-group:last-child { margin-bottom: 0; }
-  .quick-group-name { font-size: 11px; color: var(--text-light); margin-bottom: 6px; }
-  .quick-group .quick-tag { margin-right: 8px; margin-bottom: 4px; }
+  #quick-tags { display: flex; align-items: center; gap: 8px; padding: 6px 24px 10px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
+  #quick-tags::-webkit-scrollbar { height: 4px; }
+  #quick-tags::-webkit-scrollbar-thumb { background: #c8d3e0; border-radius: 2px; }
   .quick-tag {
     padding: 7px 14px; border: 1px solid var(--primary); border-radius: 20px;
     background: #fff; color: var(--primary); font-size: 12px; cursor: pointer; transition: all .15s;
@@ -584,9 +582,9 @@ $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftK
 /* 知识库选择器 */
 function filterQuickGroups() {
   const target = KB_GROUP_MAP[currentKb] ?? -1; // -1=全部
-  document.querySelectorAll(".quick-group").forEach((group, i) => {
-    if (target === -1 || i === target) group.style.display = "";
-    else group.style.display = "none";
+  quickTagEls.forEach(t => {
+    const gi = parseInt(t.dataset.grp, 10);
+    t.style.display = (target === -1 || gi === target) ? "" : "none";
   });
 }
 document.querySelectorAll(".kb-opt").forEach(btn => {
@@ -598,20 +596,17 @@ document.querySelectorAll(".kb-opt").forEach(btn => {
   };
 });
 
-QUICK_GROUPS.forEach(g => {
-  const group = document.createElement("div");
-  group.className = "quick-group";
-  const label = document.createElement("div");
-  label.className = "quick-group-name";
-  label.textContent = g.name;
-  group.appendChild(label);
+// 一行紧凑示例问题（保留 kb 联动过滤）
+const quickTagEls = [];
+QUICK_GROUPS.forEach((g, gi) => {
   g.items.forEach(q => {
     const t = document.createElement("button");
     t.className = "quick-tag"; t.textContent = q;
+    t.dataset.grp = gi;
     t.onclick = () => { $("input").value = q; send(); };
-    group.appendChild(t);
+    quickTagEls.push(t);
+    $("quick-tags").appendChild(t);
   });
-  $("quick-tags").appendChild(group);
 });
 filterQuickGroups();
 
