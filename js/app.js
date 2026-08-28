@@ -31,7 +31,7 @@ const icon = (n) => ICONS[n] || '';
 
 /* 社保法 RAG 后端地址（social_insurance/api_server.py，端口 8001）。
    置空则禁用真实 RAG，仅用本地演示模板。 */
-const API_BASE = 'https://api.3232132.xyz/api';
+const API_BASE = 'https://api.3232132.xyz';
 
 /* ============================================================
    路由：hash (#/home ...)
