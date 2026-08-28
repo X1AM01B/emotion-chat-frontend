@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公司内部知识库</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+<style>
+  :root {
+    --primary: #4f6ef7;
+    --primary-dark: #3b54d6;
+    --bg: #eef2f9;
+    --sidebar-bg: #16213a;
+    --card: #ffffff;
+    --text: #1e2a44;
+    --text-light: #7a8aa5;
+    --border: #e4e9f2;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+
+  /* ===== 登录/注册页 ===== */
+  #auth-page {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #16213a 0%, #1f2f57 45%, #4f6ef7 100%);
+  }
+  #auth-page::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(255,255,255,.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(255,255,255,.06) 0%, transparent 40%);
+  }
+  .auth-card {
+    position: relative; width: 400px; padding: 42px 38px;
+    background: rgba(255,255,255,.97); border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.35);
+    animation: fadeUp .5s ease;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+  .auth-logo {
+    width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; color: #fff; box-shadow: 0 8px 20px rgba(79,110,247,.4);
+  }
+  .auth-card h1 { text-align: center; font-size: 22px; margin-bottom: 4px; }
+  .auth-card .sub { text-align: center; color: var(--text-light); font-size: 13px; margin-bottom: 26px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 14px; outline: none; transition: border .2s;
+  }
+  .field input:focus { border-color: var(--primary); }
+  .btn-primary {
+    width: 100%; padding: 13px; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+  }
+  .btn-primary:hover { opacity: .9; }
+  .auth-switch { text-align: center; margin-top: 18px; font-size: 13px; color: var(--text-light); }
+  .auth-switch a { color: var(--primary); cursor: pointer; text-decoration: none; font-weight: 600; }
+  .auth-err { background: #fef2f2; color: var(--danger); font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+
+  /* ===== 主界面 ===== */
+  #app { display: flex; height: 100vh; }
+  #sidebar { width: 280px; background: var(--sidebar-bg); display: flex; flex-direction: column; color: #fff; }
+  .side-head { padding: 18px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .side-head .avatar {
+    width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700;
+  }
+  .side-head .who { flex: 1; }
+  .side-head .who .name { font-size: 14px; font-weight: 600; }
+  .side-head .who .role { font-size: 11px; color: #8fa3c8; }
+  .side-head .logout { background: none; border: 1px solid rgba(255,255,255,.25); color: #cbd6ea; border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+  .side-head .logout:hover { background: rgba(255,255,255,.1); }
+  #new-btn {
+    margin: 14px 14px 8px; padding: 12px; border: none; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; font-size: 14px; font-weight: 600;
+  }
+  #new-btn:hover { opacity: .9; }
+  .side-label { padding: 8px 18px 4px; font-size: 11px; color: #8fa3c8; letter-spacing: 1px; }
+  #session-list { flex: 1; overflow-y: auto; padding: 4px 10px 10px; }
+  /* 会话列表滚动条（贴合深色侧栏） */
+  #session-list { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+  #session-list::-webkit-scrollbar { width: 5px; }
+  #session-list::-webkit-scrollbar-track { background: transparent; }
+  #session-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
+  #session-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
+  .session-item {
+    display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-radius: 10px;
+    cursor: pointer; font-size: 13px; margin-bottom: 4px; color: #cbd6ea; transition: background .15s;
+  }
+  .session-item:hover { background: rgba(255,255,255,.08); }
+  .session-item.active { background: var(--primary); color: #fff; }
+  .session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-del, .session-rename { border: none; background: none; color: inherit; cursor: pointer; width: 22px; height: 22px; border-radius: 50%; opacity: 0; font-size: 15px; line-height: 1; padding: 0; }
+  .session-rename { font-size: 13px; }
+  .session-item:hover .session-del, .session-item:hover .session-rename { opacity: .45; }
+  .session-del:hover, .session-rename:hover { opacity: 1; background: rgba(255,255,255,.2); }
+
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat-title {
+    padding: 16px 24px; background: var(--card); border-bottom: 1px solid var(--border);
+    font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  #chat-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+  #messages { flex: 1; overflow-y: auto; padding: 28px 32px; }
+  /* 聊天区滚动条（贴合浅色背景） */
+  #messages { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+  #messages::-webkit-scrollbar { width: 6px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: #d3dce6; border-radius: 3px; }
+  #messages::-webkit-scrollbar-thumb:hover { background: #b8c4d2; }
+  .msg { display: flex; margin-bottom: 18px; }
+  .msg.user { justify-content: flex-end; }
+  .msg .bubble {
+    max-width: 68%; padding: 12px 16px; border-radius: 16px; line-height: 1.7; font-size: 14px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.user .bubble {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant .bubble {
+    background: var(--card); border: 1px solid var(--border);
+    border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(30,42,68,.05);
+  }
+  .msg.system { justify-content: center; }
+  .msg.system .bubble { background: #eef3ff; color: var(--text); font-size: 13px; max-width: 92%; text-align: center; }
+
+  #kb-bar { display: flex; align-items: center; gap: 8px; padding: 8px 24px 4px; }
+  #kb-bar .kb-label { font-size: 12px; color: var(--text-light); }
+  .kb-opt {
+    padding: 5px 14px; border: 1px solid var(--border); border-radius: 16px; background: #fff;
+    font-size: 12px; color: var(--text); cursor: pointer; transition: all .15s;
+  }
+  .kb-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .kb-opt:hover { border-color: var(--primary); }
+  #quick-tags-wrap { position: relative; margin: 0 24px 12px; }
+  #quick-tags {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 34px; background: #f4f7fc; border: 1px solid var(--border);
+    border-radius: 12px; overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none; -ms-overflow-style: none;  /* 隐藏滚动条，保留滚动 */
+    scroll-behavior: smooth;
+  }
+  #quick-tags::-webkit-scrollbar { display: none; }  /* WebKit 隐藏滚动条 */
+  .qs-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(255,255,255,.85); color: var(--text-light);
+    font-size: 15px; line-height: 24px; text-align: center;
+    box-shadow: 0 1px 4px rgba(30,42,68,.15); z-index: 2;
+    transition: all .2s; display: block; user-select: none;
+  }
+  .qs-btn:hover { background: var(--primary); color: #fff; }
+  #qs-left { left: 4px; }
+  #qs-right { right: 4px; }
+  #quick-tags .qt-hint {
+    flex-shrink: 0; font-size: 12px; color: var(--text-light); font-weight: 600;
+  }
+  .quick-tag {
+    flex-shrink: 0; padding: 5px 12px; border: none; border-radius: 14px;
+    background: #fff; color: var(--text); font-size: 12px; cursor: pointer; transition: all .15s;
+    box-shadow: 0 1px 3px rgba(30,42,68,.06);
+  }
+  .quick-tag:hover { background: var(--primary); color: #fff; }
+
+  /* ===== Markdown 渲染样式 ===== */
+  .msg.assistant .bubble { white-space: normal; }
+  .msg.assistant .bubble a { color: var(--primary); text-decoration: none; }
+  .msg.assistant .bubble a:hover { text-decoration: underline; }
+  .msg.assistant .bubble code { background: #f0f2f7; padding: 2px 5px; border-radius: 4px; font-size: 12px; font-family: "SF Mono", Consolas, "Courier New", monospace; }
+  .msg.assistant .bubble pre { background: #1e2a44; color: #e6ebf5; padding: 12px 14px; border-radius: 10px; overflow-x: auto; margin: 8px 0; }
+  .msg.assistant .bubble pre code { background: none; padding: 0; color: inherit; }
+  .msg.assistant .bubble ul, .msg.assistant .bubble ol { padding-left: 22px; margin: 6px 0; }
+  .msg.assistant .bubble li { margin: 2px 0; }
+  .msg.assistant .bubble h1, .msg.assistant .bubble h2, .msg.assistant .bubble h3, .msg.assistant .bubble h4, .msg.assistant .bubble h5, .msg.assistant .bubble h6 { margin: 10px 0 6px; line-height: 1.4; }
+  .msg.assistant .bubble p { margin: 6px 0; }
+  .msg.assistant .bubble blockquote { border-left: 3px solid var(--primary); margin: 8px 0; padding: 4px 12px; color: var(--text-light); background: #f8fafc; border-radius: 0 8px 8px 0; }
+  .msg.assistant .bubble table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  .msg.assistant .bubble th, .msg.assistant .bubble td { border: 1px solid var(--border); padding: 6px 10px; }
+  .msg.assistant .bubble img { max-width: 100%; border-radius: 8px; }
+  .msg.assistant .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  /* ===== 参考文档 ===== */
+  .ref-box { margin-top: 8px; font-size: 12px; }
+  .ref-toggle {
+    background: #f0f4ff; border: 1px solid #d3e0fd; color: var(--primary);
+    padding: 5px 12px; border-radius: 14px; cursor: pointer; font-size: 12px;
+  }
+  .ref-toggle:hover { background: #e0eaff; }
+  .ref-list { margin-top: 6px; padding: 8px 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; }
+  .ref-item { padding: 6px 8px; border-bottom: 1px dashed var(--border); font-size: 12px; color: var(--text); }
+  .ref-item:last-child { border-bottom: none; }
+  .ref-item .ref-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; margin-right: 6px; }
+  .ref-tag.purchase { background: #d1fae5; color: #065f46; }
+  .ref-tag.purchase_qa { background: #e0e7ff; color: #3730a3; }
+  .ref-tag.legal { background: #fef3c7; color: #92400e; }
+  .ref-item .ref-title { font-weight: 600; margin-right: 6px; }
+  .ref-item .ref-score { color: var(--text-light); }
+  .ref-item .ref-orig { display: block; margin-top: 3px; color: var(--text-light); white-space: pre-wrap; word-break: break-word; max-height: 80px; overflow-y: auto; }
+  #input-bar { display: flex; padding: 14px 24px 20px; gap: 12px; }
+  #input {
+    flex: 1; padding: 13px 16px; border: 1.5px solid var(--border); border-radius: 12px;
+    resize: none; font-size: 14px; outline: none; transition: border .2s; background: var(--card);
+  }
+  #input:focus { border-color: var(--primary); }
+  #send-btn {
+    padding: 0 28px; border: none; border-radius: 12px; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; font-size: 14px; font-weight: 600;
+  }
+  #send-btn:hover { opacity: .9; }
+  #send-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ===== 管理员面板 ===== */
+  #admin-panel {
+    position: fixed; inset: 0; z-index: 90; background: rgba(15,23,42,.6);
+    display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+  }
+  #admin-panel.show { display: flex; }
+  .admin-card {
+    width: 760px; max-height: 82vh; overflow-y: auto; background: var(--card);
+    scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+    border-radius: 18px; padding: 28px; box-shadow: 0 24px 60px rgba(0,0,0,.3);
+  }
+  .admin-card h2 { font-size: 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .admin-card .close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-light); }
+  .admin-add { display: flex; gap: 10px; margin-bottom: 18px; }
+  .admin-add input { flex: 1; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; }
+  .admin-add input:focus { border-color: var(--primary); }
+  .admin-add .btn-primary { width: auto; padding: 10px 20px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-light); font-weight: 600; font-size: 12px; background: #f8fafc; }
+  .role-badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .role-badge.admin { background: #fef3c7; color: #92400e; }
+  .role-badge.user { background: #e0e7ff; color: #3730a3; }
+  .btn-danger { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
+  .btn-view { background: none; border: 1px solid var(--primary); color: var(--primary); padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+  .btn-view:hover { background: var(--primary); color: #fff; }
+  .btn-back { background: none; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 14px; }
+  .btn-back:hover { background: #f0f4ff; }
+  .admin-btn {
+    margin: 8px 14px 0; padding: 10px; border: none; border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,.1); color: #cbd6ea; font-size: 13px;
+  }
+  .admin-btn:hover { background: rgba(255,255,255,.2); }
+  .empty { text-align: center; color: var(--text-light); padding: 30px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ===== 登录/注册 ===== -->
+<div id="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">📚</div>
+    <h1 id="auth-title">欢迎登录</h1>
+    <div class="sub">公司内部知识库</div>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="field"><label>用户名</label><input id="auth-username" placeholder="请输入用户名" autocomplete="username"></div>
+    <div class="field"><label>密码</label><input id="auth-password" type="password" placeholder="请输入密码" autocomplete="current-password"></div>
+    <button class="btn-primary" id="auth-submit">登 录</button>
+    <div class="auth-switch"><span id="auth-switch-text">还没有账号？<a id="auth-switch-link">立即注册</a></span></div>
+  </div>
+</div>
+
+<!-- ===== 主界面 ===== -->
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="side-head">
+      <div class="avatar" id="my-avatar">客</div>
+      <div class="who">
+        <div class="name" id="my-name">用户</div>
+        <div class="role" id="my-role">普通用户</div>
+      </div>
+      <button class="logout" id="logout-btn">退出</button>
+    </div>
+    <button id="new-btn">＋ 新会话</button>
+    <div class="side-label">最近会话</div>
+    <div id="session-list"></div>
+    <button class="admin-btn" id="admin-btn" style="display:none">🛠 用户管理</button>
+  </div>
+  <div id="main">
+    <div id="chat-title"><span class="dot"></span><span id="chat-title-text">内部知识库问答</span></div>
+    <div id="messages"></div>
+    <div id="kb-bar">
+      <span class="kb-label">知识库：</span>
+      <button class="kb-opt active" data-kb="all">全部</button>
+      <button class="kb-opt" data-kb="purchase">员工手册</button>
+      <button class="kb-opt" data-kb="legal">项目接口</button>
+      <button class="kb-opt" data-kb="psych">需求文档</button>
+    </div>
+    <div id="quick-tags-wrap">
+      <button class="qs-btn" id="qs-left" title="向左滚动">‹</button>
+      <div id="quick-tags"></div>
+      <button class="qs-btn" id="qs-right" title="向右滚动">›</button>
+    </div>
+    <div id="input-bar">
+      <textarea id="input" rows="1" placeholder="请输入您的问题，例如：请假流程怎么走？（Enter 发送）"></textarea>
+      <button id="send-btn">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 管理员面板 ===== -->
+<div id="admin-panel">
+  <div class="admin-card">
+    <h2>👥 用户管理 <button class="close" id="admin-close">×</button></h2>
+    <div id="admin-view-list">
+      <div class="admin-add">
+        <input id="add-username" placeholder="新用户用户名">
+        <input id="add-password" type="password" placeholder="初始密码">
+        <button class="btn-primary" id="add-user-btn">添加用户</button>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>会话数</th><th>注册时间</th><th>操作</th></tr></thead>
+        <tbody id="user-table"></tbody>
+      </table>
+      <div class="empty" id="user-empty" style="display:none">暂无用户</div>
+    </div>
+    <div id="admin-view-sessions" style="display:none">
+      <button class="btn-back" id="admin-back-sessions">← 返回用户列表</button>
+      <h3 id="admin-user-title" style="margin-bottom:12px;font-size:15px;"></h3>
+      <table>
+        <thead><tr><th>会话标题</th><th>消息数</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody id="user-sessions-table"></tbody>
+      </table>
+      <div class="empty" id="user-sessions-empty" style="display:none">该用户暂无会话</div>
+    </div>
+    <div id="admin-view-chat" style="display:none">
+      <button class="btn-back" id="admin-back-chat">← 返回会话列表</button>
+      <h3 id="admin-chat-title" style="margin-bottom:12px;font-size:15px;"></h3>
+      <div id="admin-chat-msgs" style="max-height:50vh;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:16px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "https://api.3232132.xyz/api";
+const QUICK_GROUPS = [
+  { name: "📋 员工手册", kb: ["purchase", "purchase_qa"], items: ["新员工入职流程是怎样的？", "请假和报销的流程怎么走？"] },
+  { name: "🔌 项目接口", kb: ["legal"], items: ["登录接口的鉴权方式是什么？", "XX系统接口文档在哪里查看？"] },
+  { name: "📝 需求文档", kb: [], items: ["商城系统的需求文档包含哪些模块？", "订单模块的需求说明在哪里？"] }
+];
+// 知识库选项 -> 快捷问题组映射 (all 显示全部, 其余按组匹配)
+const KB_GROUP_MAP = { "all": -1, "purchase": 0, "legal": 1, "psych": 2 };
+const $ = id => document.getElementById(id);
+let token = localStorage.getItem("token") || "";
+let username = localStorage.getItem("username") || "";
+let role = localStorage.getItem("role") || "";
+let currentSid = null;
+let currentKb = "all"; // all / purchase(员工手册) / legal(项目接口) / psych(需求文档)
+
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const r = await fetch(API_BASE + path, { ...opts, headers });
+  let data;
+  try { data = await r.json(); } catch { data = {}; }
+  if (!r.ok) throw new Error(data.detail || "请求失败");
+  return data;
+}
+
+/* ===== 认证 ===== */
+let isLoginMode = true;
+function showAuth() {
+  $("auth-page").style.display = "flex";
+  $("app").style.display = "none";
+}
+function showApp() {
+  $("auth-page").style.display = "none";
+  $("app").style.display = "flex";
+  $("my-name").textContent = username;
+  $("my-role").textContent = role === "admin" ? "管理员" : "普通用户";
+  $("my-avatar").textContent = username[0] ? username[0].toUpperCase() : "客";
+  $("admin-btn").style.display = role === "admin" ? "block" : "none";
+  $("messages").innerHTML = '<div class="msg system"><div class="bubble">👋 欢迎使用<strong>公司内部知识库</strong>！<br>📌 员工手册 · 项目接口 · 需求文档<br>点击「＋ 新会话」或下方快捷提问开始吧！</div></div>';
+  loadSessions();
+}
+async function doAuth() {
+  const u = $("auth-username").value.trim();
+  const p = $("auth-password").value;
+  const err = $("auth-err");
+  err.style.display = "none";
+  if (!u || !p) { err.textContent = "请输入用户名和密码"; err.style.display = "block"; return; }
+  try {
+    const path = isLoginMode ? "/login" : "/register";
+    const d = await api(path, { method: "POST", body: JSON.stringify({ username: u, password: p }) });
+    token = d.token; username = d.username; role = d.role;
+    localStorage.setItem("token", token);
+    localStorage.setItem("username", username);
+    localStorage.setItem("role", role);
+    showApp();
+  } catch (e) { err.textContent = e.message; err.style.display = "block"; }
+}
+$("auth-submit").onclick = doAuth;
+$("auth-password").addEventListener("keydown", e => { if (e.key === "Enter") doAuth(); });
+function toggleAuthMode() {
+  isLoginMode = !isLoginMode;
+  $("auth-title").textContent = isLoginMode ? "欢迎登录" : "创建账号";
+  $("auth-submit").textContent = isLoginMode ? "登 录" : "注 册";
+  $("auth-switch-text").innerHTML = isLoginMode ? '还没有账号？<a id="auth-switch-link">立即注册</a>' : '已有账号？<a id="auth-switch-link">去登录</a>';
+  document.getElementById("auth-switch-link").onclick = toggleAuthMode;
+}
+document.getElementById("auth-switch-link").onclick = toggleAuthMode;
+$("logout-btn").onclick = () => {
+  localStorage.clear(); token = ""; username = ""; role = ""; currentSid = null;
+  showAuth();
+};
+
+/* ===== 会话 ===== */
+async function loadSessions() {
+  const d = await api("/sessions");
+  $("session-list").innerHTML = "";
+  if (!d.sessions.length) { $("session-list").innerHTML = '<div class="empty">暂无会话</div>'; return; }
+  d.sessions.forEach(s => {
+    const div = document.createElement("div");
+    div.className = "session-item" + (s.session_id === currentSid ? " active" : "");
+    div.onclick = () => openSession(s.session_id, s.title);
+    const title = document.createElement("span");
+    title.className = "session-title";
+    title.textContent = s.title || s.session_id;
+    title.onclick = e => { e.stopPropagation(); openSession(s.session_id, s.title); };
+    const del = document.createElement("button");
+    del.className = "session-del"; del.textContent = "×"; del.title = "删除会话";
+    del.onclick = async e => {
+      e.stopPropagation();
+      if (!confirm("确定删除该会话？")) return;
+      try {
+        await api(`/sessions/${s.session_id}`, { method: "DELETE" });
+        if (currentSid === s.session_id) { currentSid = null; $("chat-title-text").textContent = "内部知识库问答"; $("messages").innerHTML = ""; }
+        loadSessions();
+      } catch (err) { alert("删除失败：" + err.message); }
+    };
+    const rename = document.createElement("button");
+    rename.className = "session-rename"; rename.textContent = "✏️"; rename.title = "重命名会话";
+    rename.onclick = async e => {
+      e.stopPropagation();
+      const cur = s.title || s.session_id;
+      const input = prompt("请输入新的会话标题：", cur);
+      if (input === null) return;
+      const newTitle = input.trim();
+      if (!newTitle || newTitle === cur) return;
+      try {
+        await api(`/sessions/${s.session_id}`, { method: "PATCH", body: JSON.stringify({ title: newTitle }) });
+        if (currentSid === s.session_id) $("chat-title-text").textContent = newTitle;
+        loadSessions();
+      } catch (err) { alert("重命名失败：" + err.message); }
+    };
+    div.appendChild(title); div.appendChild(rename); div.appendChild(del);
+    $("session-list").appendChild(div);
+  });
+}
+async function openSession(sid, title) {
+  currentSid = sid;
+  $("chat-title-text").textContent = title || sid;
+  document.querySelectorAll(".session-item").forEach(e => e.classList.remove("active"));
+  loadSessions();
+  const d = await api(`/sessions/${sid}/messages`);
+  $("messages").innerHTML = "";
+  d.messages.forEach(m => addMsg(m.role, m.content));
+}
+function renderSources(bubble, sources) {
+  if (!sources || !sources.length) return;
+  const box = document.createElement("div");
+  box.className = "ref-box";
+  const toggle = document.createElement("button");
+  toggle.className = "ref-toggle";
+  toggle.textContent = `📎 参考文档 (${sources.length})`;
+  const list = document.createElement("div");
+  list.className = "ref-list";
+  list.style.display = "none";
+  const typeLabel = {
+    purchase: "采购项目", purchase_qa: "采购问答", legal: "法务问答",
+    "项目简介": "项目简介", "需求文档": "需求文档", "接口文档": "接口文档",
+    "部署手册": "部署手册", "操作手册": "操作手册", internal_doc: "内部文档"
+  };
+  sources.forEach(s => {
+    const m = s.meta || {};
+    const item = document.createElement("div");
+    item.className = "ref-item";
+    const tag = document.createElement("span");
+    const docType = m.文档类型 || m.type || "";
+    tag.className = "ref-tag " + (docType === "接口文档" ? "legal" : docType === "需求文档" ? "purchase" : docType === "项目简介" ? "purchase_qa" : m.type || "");
+    tag.textContent = typeLabel[docType] || typeLabel[m.type] || docType || "文档";
+    const title = document.createElement("span");
+    title.className = "ref-title";
+    title.textContent = m.项目名称 || m.项目 || m.question || "(文档)";
+    const score = document.createElement("span");
+    score.className = "ref-score";
+    score.textContent = `相似度 ${(s.score * 100).toFixed(0)}%`;
+    item.appendChild(tag); item.appendChild(title); item.appendChild(score);
+    if (m.原文) {
+      const orig = document.createElement("span");
+      orig.className = "ref-orig";
+      orig.textContent = m.原文.length > 200 ? m.原文.slice(0, 200) + "…" : m.原文;
+      item.appendChild(orig);
+    }
+    list.appendChild(item);
+  });
+  toggle.onclick = () => { list.style.display = list.style.display === "none" ? "block" : "none"; };
+  box.appendChild(toggle); box.appendChild(list);
+  bubble.appendChild(box);
+}
+function renderMarkdown(text) {
+  return DOMPurify.sanitize(marked.parse(text || "", { breaks: true }));
+}
+function addMsg(role, content, sources) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  const b = document.createElement("div");
+  b.className = "bubble";
+  // assistant 消息渲染 Markdown（已 sanitize 防 XSS），user/system 保持纯文本
+  if (role === "assistant") {
+    b.innerHTML = renderMarkdown(content);
+  } else {
+    b.textContent = content;
+  }
+  div.appendChild(b);
+  // 参考文档展示（仅 assistant 且有 sources）
+  if (role === "assistant" && sources && sources.length) renderSources(div, sources);
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+async function send() {
+  const text = $("input").value.trim();
+  if (!text || !currentSid) return;
+  $("input").value = "";
+  addMsg("user", text);
+  $("send-btn").disabled = true;
+  try {
+    await streamMessage(text);
+  } catch (e) {
+    addMsg("system", "⚠️ " + e.message);
+  }
+  $("send-btn").disabled = false;
+}
+
+/* ===== SSE 流式发送 ===== */
+async function streamMessage(text) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/sessions/${currentSid}/messages/stream`, {
+      method: "POST", headers, body: JSON.stringify({ content: text, use_rag: true, kb: currentKb })
+    });
+  } catch (e) {
+    return fallbackSend(text); // 网络错误 → 回退非流式
+  }
+  // 后端不支持流式（404/500 等）或无 body → 回退非流式
+  if (!res.ok || !res.body) return fallbackSend(text);
+
+  const div = document.createElement("div");
+  div.className = "msg assistant";
+  const b = document.createElement("div");
+  b.className = "bubble";
+  div.appendChild(b);
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+
+  let full = "";            // 累积的纯文本（每个 chunk 后整体重新渲染）
+  let gotContent = false;   // 是否已收到过内容（用于覆盖 status 提示）
+  let sourcesRendered = false;
+  const rerender = () => {
+    b.innerHTML = renderMarkdown(full);
+    $("messages").scrollTop = $("messages").scrollHeight;
+  };
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const dataLine = raw.split("\n").find(l => l.trim().startsWith("data:"));
+      if (!dataLine) continue;
+      let evt;
+      try { evt = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+      if (!evt || typeof evt !== "object") continue;
+      if (evt.type === "status") {
+        // 状态提示，待第一个 chunk 到来后会被内容覆盖
+        if (!gotContent) b.textContent = "⏳ " + (evt.msg || "正在处理...");
+      } else if (evt.type === "chunk") {
+        gotContent = true;
+        full += (evt.content || "");
+        rerender();
+      } else if (evt.type === "sources") {
+        if (!sourcesRendered && evt.sources && evt.sources.length) {
+          sourcesRendered = true;
+          renderSources(div, evt.sources);
+        }
+      } else if (evt.type === "error") {
+        b.textContent = "⚠️ " + (evt.detail || "服务出错");
+        return;
+      } else if (evt.type === "done") {
+        return; // 流式正常结束
+      }
+    }
+  }
+  // 流自然结束（未收到 done 也视为完成）
+}
+async function fallbackSend(text) {
+  const d = await api(`/sessions/${currentSid}/messages`, { method: "POST", body: JSON.stringify({ content: text, use_rag: true }) });
+  addMsg("assistant", d.content, d.sources || []);
+}
+$("new-btn").onclick = async () => {
+  const d = await api("/sessions", { method: "POST", body: JSON.stringify({ title: "新会话 " + new Date().toLocaleTimeString() }) });
+  openSession(d.session_id, d.title);
+};
+$("send-btn").onclick = send;
+$("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+/* 知识库选择器 */
+function filterQuickGroups() {
+  const target = KB_GROUP_MAP[currentKb] ?? -1; // -1=全部
+  quickTagEls.forEach(t => {
+    const gi = parseInt(t.dataset.grp, 10);
+    t.style.display = (target === -1 || gi === target) ? "" : "none";
+  });
+  updateQsBtns(); // 过滤后刷新按钮状态
+}
+
+/* 快捷问题左右滚动按钮 */
+function updateQsBtns() {
+  const el = $("quick-tags");
+  if (!el) return;
+  const maxScroll = el.scrollWidth - el.clientWidth;
+  const canScroll = maxScroll > 4;
+  // 反转逻辑：默认显示，仅当完全无法滚动或到边界时隐藏对应按钮
+  $("qs-left").style.display = (canScroll && el.scrollLeft > 4) ? "block" : "none";
+  $("qs-right").style.display = (canScroll && el.scrollLeft < maxScroll - 4) ? "block" : "none";
+}
+$("qs-left").onclick = () => { $("quick-tags").scrollBy({ left: -220, behavior: "smooth" }); };
+$("qs-right").onclick = () => { $("quick-tags").scrollBy({ left: 220, behavior: "smooth" }); };
+$("quick-tags").addEventListener("scroll", updateQsBtns, { passive: true });
+// 字体/布局就绪后重算按钮显隐（延迟 + 帧回调 + resize）
+function refreshQsBtns() { requestAnimationFrame(() => { requestAnimationFrame(updateQsBtns); }); }
+window.addEventListener("resize", refreshQsBtns);
+setTimeout(refreshQsBtns, 100);
+setTimeout(refreshQsBtns, 500);
+document.querySelectorAll(".kb-opt").forEach(btn => {
+  btn.onclick = () => {
+    currentKb = btn.dataset.kb;
+    document.querySelectorAll(".kb-opt").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    filterQuickGroups();
+  };
+});
+
+// 一行紧凑示例问题（保留 kb 联动过滤）
+const quickTagEls = [];
+const qtHint = document.createElement("span");
+qtHint.className = "qt-hint";
+qtHint.textContent = "💡 试试问：";
+$("quick-tags").appendChild(qtHint);
+QUICK_GROUPS.forEach((g, gi) => {
+  g.items.forEach(q => {
+    const t = document.createElement("button");
+    t.className = "quick-tag"; t.textContent = q;
+    t.dataset.grp = gi;
+    t.onclick = () => { $("input").value = q; send(); };
+    quickTagEls.push(t);
+    $("quick-tags").appendChild(t);
+  });
+});
+filterQuickGroups();
+
+/* ===== 管理员 ===== */
+let adminViewUser = null;
+function adminShowView(name) {
+  $("admin-view-list").style.display = name === "list" ? "block" : "none";
+  $("admin-view-sessions").style.display = name === "sessions" ? "block" : "none";
+  $("admin-view-chat").style.display = name === "chat" ? "block" : "none";
+}
+async function loadUsers() {
+  const d = await api("/admin/users");
+  const tb = $("user-table");
+  tb.innerHTML = "";
+  $("user-empty").style.display = d.users.length ? "none" : "block";
+  d.users.forEach(u => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${u.id}</td><td>${u.username}</td>
+      <td><span class="role-badge ${u.role}">${u.role === "admin" ? "管理员" : "用户"}</span></td>
+      <td>${u.session_count}</td><td>${u.created_at}</td>
+      <td>
+        <button class="btn-view" data-view="${u.username}">查看对话</button>
+        ${u.username === username ? "当前账号" : `<button class="btn-danger" data-del="${u.id}" data-name="${u.username}">删除</button>`}
+      </td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("[data-del]").forEach(btn => {
+    btn.onclick = async () => {
+      const name = btn.dataset.name;
+      if (!confirm(`确定删除用户「${name}」？其全部会话将被清除。`)) return;
+      try {
+        await api(`/admin/users/${btn.dataset.del}`, { method: "DELETE" });
+        loadUsers();
+      } catch (e) { alert(e.message); }
+    };
+  });
+  tb.querySelectorAll("[data-view]").forEach(btn => {
+    btn.onclick = () => adminViewUserSessions(btn.dataset.view);
+  });
+}
+async function adminViewUserSessions(uname) {
+  adminViewUser = uname;
+  adminShowView("sessions");
+  $("admin-user-title").textContent = `📋 用户「${uname}」的会话`;
+  const d = await api(`/admin/users/${uname}/sessions`);
+  const tb = $("user-sessions-table");
+  tb.innerHTML = "";
+  $("user-sessions-empty").style.display = d.sessions.length ? "none" : "block";
+  d.sessions.forEach(s => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${s.title || s.session_id}</td><td>${s.msg_count}</td>
+      <td>${s.created_at}</td>
+      <td><button class="btn-view" data-sid="${s.session_id}" data-title="${(s.title || s.session_id).replace(/"/g, '&quot;')}">查看对话</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("[data-sid]").forEach(btn => {
+    btn.onclick = () => adminViewChat(btn.dataset.sid, btn.dataset.title);
+  });
+}
+async function adminViewChat(sid, title) {
+  adminShowView("chat");
+  $("admin-chat-title").textContent = `💬 ${title}`;
+  const d = await api(`/sessions/${sid}/messages`);
+  const box = $("admin-chat-msgs");
+  box.innerHTML = "";
+  d.messages.forEach(m => {
+    const div = document.createElement("div");
+    div.style.cssText = `margin-bottom:12px;display:flex;${m.role === "user" ? "justify-content:flex-end;" : ""}`;
+    const b = document.createElement("div");
+    b.style.cssText = `max-width:75%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;word-break:break-word;${
+      m.role === "user" ? "background:var(--primary);color:#fff;" : "background:#fff;border:1px solid var(--border);"}`;
+    if (m.role === "assistant") {
+      b.innerHTML = renderMarkdown(m.content);
+    } else {
+      b.textContent = m.content;
+    }
+    div.appendChild(b);
+    box.appendChild(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+$("admin-btn").onclick = () => { $("admin-panel").classList.add("show"); adminShowView("list"); loadUsers(); };
+$("admin-close").onclick = () => $("admin-panel").classList.remove("show");
+$("admin-back-sessions").onclick = () => adminShowView("list");
+$("admin-back-chat").onclick = () => { if (adminViewUser) adminViewUserSessions(adminViewUser); };
+$("add-user-btn").onclick = async () => {
+  const u = $("add-username").value.trim();
+  const p = $("add-password").value;
+  if (!u || !p) { alert("请填写用户名和密码"); return; }
+  try {
+    await api("/admin/users", { method: "POST", body: JSON.stringify({ username: u, password: p }) });
+    $("add-username").value = ""; $("add-password").value = "";
+    loadUsers();
+  } catch (e) { alert(e.message); }
+};
+
+/* ===== 初始化 ===== */
+(async () => {
+  if (token) {
+    try { const me = await api("/me"); username = me.username; role = me.role; localStorage.setItem("role", role); showApp(); }
+    catch { showAuth(); }
+  } else { showAuth(); }
+})();
+</script>
+</body>
+</html>
